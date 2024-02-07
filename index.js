@@ -4,6 +4,7 @@ const cors = require("cors");
 const app = express();
 
 app.use(cors());
+app.use(express.json());
 
 const products = [
   {
@@ -45,15 +46,30 @@ app.get("/products", (request, response) => {
 });
 
 app.post("/products", (request, response) => {
+  const { title, description, price, image } = request.body;
+
   products.push({
     id: "104",
-    title: "Iphone 10",
-    description: "This is iphone 10",
-    price: "20000",
-    image:
-      "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f5/IPhone_15_Pro_Vector.svg/186px-IPhone_15_Pro_Vector.svg.png",
+    title: title,
+    description: description,
+    price: price,
+    image: image,
   });
   response.json({ message: "Product added successfully" });
+});
+
+app.put("/products/:id", (request, response) => {
+  const { id } = request.params;
+  const { title, description, price, image } = request.body;
+
+  const product = products.find((product) => product.id === id);
+
+  product.title = title;
+  product.description = description;
+  product.price = price;
+  product.image = image;
+
+  response.json({ message: "Product updated successfully" });
 });
 
 app.listen(3000, () => {
