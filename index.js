@@ -72,7 +72,15 @@ app.put("/products/:id", (request, response) => {
   response.json({ message: "Product updated successfully" });
 });
 
-app.delete();
+app.delete("/products/:id", (request, response) => {
+  const { id } = request.params;
+
+  const productIndex = products.findIndex((product) => product.id === id);
+
+  products.splice(productIndex, 1);
+
+  response.json({ products: products });
+});
 
 app.listen(3000, () => {
   console.log("Server is running on port 3000");
