@@ -1,11 +1,26 @@
 const express = require("express");
 const cors = require("cors");
 const { prisma } = require("./prisma");
+const multer = require("multer");
+const fs = require("fs");
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, "./storage/");
+  },
+  filename: function (req, file, cb) {
+    cb(null, "unique_" + file.originalname);
+  },
+});
+
+const upload = multer({ storage: storage });
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+app.use("/storage", express.static("storage"));
 
 // const products = [
 //   {
@@ -58,8 +73,9 @@ app.get("/products/:id", async (request, response) => {
   response.json({ product: product });
 });
 
-app.post("/products", async (request, response) => {
-  const { title, description, price, image } = request.body;
+app.post("/products", upload.single("image"), async (request, response) => {
+  const { title, description, price } = request.body;
+  const image = request.file;
 
   // products.push({
   //   id: "104",
@@ -68,6 +84,8 @@ app.post("/products", async (request, response) => {
   //   price: price,
   //   image: image,
   // });
+
+  fs;
 
   if (price < 0) {
     response.json({ message: "Price needs to be greater than 0" });
@@ -79,14 +97,14 @@ app.post("/products", async (request, response) => {
       title: title,
       description: description,
       price: price,
-      image: image,
+      image: image.path,
     },
   });
 
   response.json({ message: "Product added successfully", product: product });
 });
 
-app.put("/products/:id", async (request, response) => {
+app.put("/products/:id", upload.single("image"), async (request, response) => {
   const { id } = request.params;
   const { title, description, price, image } = request.body;
 
