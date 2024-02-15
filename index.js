@@ -3,6 +3,10 @@ const cors = require("cors");
 const { prisma } = require("./prisma");
 const multer = require("multer");
 const fs = require("fs");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const dotenv = require("dotenv");
+dotenv.config();
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -134,6 +138,64 @@ app.delete("/products/:id", async (request, response) => {
   await prisma.product.delete({ where: { id: parseInt(id) } });
 
   response.json({ products: products });
+});
+
+app.post("/register", async (request, response) => {
+  const { name, email, password } = request.body;
+
+  const salt = await bcrypt.genSaltSync(10);
+  const hashedPassword = await bcrypt.hash(password, salt);
+
+  const user = await prisma.user.create({
+    data: {
+      name: name,
+      email: email,
+      password: hashedPassword,
+    },
+  });
+
+  const jwtToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET_KEY);
+
+  response.json({ message: "Success", token: jwtToken });
+});
+
+app.post("/login", async (request, response) => {
+  const { email, password } = request.body;
+
+  const userExists = await prisma.user.findUnique({
+    where: {
+      email: email,
+    },
+  });
+
+  if (!userExists) {
+    response.json({ message: "User does not exist" });
+    return;
+  }
+
+  const isPasswordValid = await bcrypt.compare(password, userExists.password);
+
+  if (!isPasswordValid) {
+    response.json({ message: "Incorrect Password" });
+    return;
+  }
+
+  const jwtToken = jwt.sign({ id: userExists.id }, process.env.JWT_SECRET_KEY, {
+    expiresIn: "1h",
+  });
+
+  response.json({ message: "Success", token: jwtToken });
+});
+
+app.post("/verify", async (request, response) => {
+  const { token } = request.body;
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+    response.json({ message: "Success", user: decoded });
+  } catch (error) {
+    response.json({ message: "Invalid Token" });
+  }
 });
 
 app.listen(3000, () => {
