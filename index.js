@@ -61,6 +61,23 @@ app.use("/storage", express.static("storage"));
 //   },
 // ];
 
+async function checkAuth(request, response, next) {
+  const token = request.headers.authorization;
+
+  if (!token) {
+    response.json({ message: "Not Logged in" });
+    return;
+  }
+
+  try {
+    const decoded = await jwt.verify(token, process.env.JWT_SECRET_KEY);
+    request.user_id = decoded.id;
+    next();
+  } catch (error) {
+    response.json({ message: "Invalid Token" });
+  }
+}
+
 app.get("/products", async (request, response) => {
   const products = await prisma.product.findMany();
 
@@ -77,7 +94,7 @@ app.get("/products/:id", async (request, response) => {
   response.json({ product: product });
 });
 
-app.post("/products", upload.single("image"), async (request, response) => {
+app.post("/products", async (request, response) => {
   const { title, description, price } = request.body;
   const image = request.file;
 
@@ -89,8 +106,6 @@ app.post("/products", upload.single("image"), async (request, response) => {
   //   image: image,
   // });
 
-  fs;
-
   if (price < 0) {
     response.json({ message: "Price needs to be greater than 0" });
     return;
@@ -101,7 +116,7 @@ app.post("/products", upload.single("image"), async (request, response) => {
       title: title,
       description: description,
       price: price,
-      image: image.path,
+      image: "image.path",
     },
   });
 
@@ -141,7 +156,7 @@ app.delete("/products/:id", async (request, response) => {
 });
 
 app.post("/register", async (request, response) => {
-  const { name, email, password } = request.body;
+  const { name, email, password, balance } = request.body;
 
   const salt = await bcrypt.genSaltSync(10);
   const hashedPassword = await bcrypt.hash(password, salt);
@@ -151,6 +166,7 @@ app.post("/register", async (request, response) => {
       name: name,
       email: email,
       password: hashedPassword,
+      balance: balance,
     },
   });
 
@@ -165,6 +181,13 @@ app.post("/login", async (request, response) => {
   const userExists = await prisma.user.findUnique({
     where: {
       email: email,
+    },
+    include: {
+      favourites: {
+        include: {
+          product: true,
+        },
+      },
     },
   });
 
@@ -184,20 +207,46 @@ app.post("/login", async (request, response) => {
     expiresIn: "1h",
   });
 
-  response.json({ message: "Success", token: jwtToken });
+  response.json({ message: "Success", token: jwtToken, user: userExists });
 });
 
-app.post("/verify", async (request, response) => {
-  const { token } = request.body;
+// app.post("/verify", async (request, response) => {
+//   const { token } = request.body;
 
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
-    response.json({ message: "Success", user: decoded });
-  } catch (error) {
-    response.json({ message: "Invalid Token" });
-  }
-});
+//   try {
+//     const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+//     response.json({ message: "Success", user: decoded });
+//   } catch (error) {
+//     response.json({ message: "Invalid Token" });
+//   }
+// });
 
 app.listen(3000, () => {
   console.log("Server is running on port 3000");
+});
+
+app.get("/balance", checkAuth, async (request, response) => {
+  const id = request.user_id;
+
+  const user = await prisma.user.findUnique({ where: { id: parseInt(id) } });
+
+  response.json({ balance: user.balance });
+});
+
+app.post("/favorites", checkAuth, async (request, response) => {
+  const id = request.user_id;
+
+  const { product_id } = request.body;
+
+  const favourite = await prisma.favourites.create({
+    data: {
+      product_id: product_id,
+      user_id: id,
+    },
+  });
+
+  response.json({
+    message: "Product added to favourites",
+    favourite: favourite,
+  });
 });
